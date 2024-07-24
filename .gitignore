@@ -1,15 +1,30 @@
-# See http://help.github.com/ignore-files/ for more about ignoring files.
+.idea
+.ipynb_checkpoints
+.mypy_cache
+.vscode
+__pycache__
+.pytest_cache
+htmlcov
+dist
+site
+.coverage
+coverage.xml
+.netlify
+test.db
+log.txt
+Pipfile.lock
+env3.*
+env
+docs_build
+site_build
+venv
+docs.zip
+archive.zip
 
-# dependencies
+# vim temporary files
+*~
+.*.sw?
+.cache
 
-# IDEs and editors
-/.idea
-
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.history/*
-
+# macOS
+.DS_Store
