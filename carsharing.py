@@ -11,8 +11,7 @@ app.include_router(web.routers)
 app.include_router(cars.router)
 
 origins = [
-    "http://localhost:8000",
-    "http://localhost:8080",
+    "http://localhost:4200"
 ]
 
 app.add_middleware(
@@ -37,4 +36,4 @@ async def add_car_cookies(request: Request, call_next):
 
 
 if __name__ == "__main__":
-    uvicorn.run("carsharing:app", reload=True, port=8001)
+    uvicorn.run("carsharing:app", reload=True, port=8000)

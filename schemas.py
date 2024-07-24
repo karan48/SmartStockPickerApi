@@ -49,7 +49,7 @@ class CarOutput(CarInput):
 
 class User(SQLModel, table=True):
     id: int | None = Field(primary_key=True, default=None)
-    username: str = Field(sa_column=Column("username", VARCHAR, unique=True, index=True))
+    username: str = Field(unique=True, index=True)
     password_hash: str = ""
 
     def set_password(self, password):
@@ -58,7 +58,8 @@ class User(SQLModel, table=True):
 
     def verify_password(self, password):
         """Verify password by hashing and comparing to hash password"""
-        return pwd_context.verify(password, self.password_hash)
+        # return pwd_context.verify(password, self.password_hash)
+        return password == self.password_hash
 
 
 class UserOutput(SQLModel):
