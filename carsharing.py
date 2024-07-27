@@ -4,11 +4,12 @@ from sqlmodel import SQLModel
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import engine
-from routers import cars, web, auth
+from routers import cars, web, auth, nse
 
 app = FastAPI(title="Car Sharing")
 app.include_router(web.routers)
 app.include_router(cars.router)
+app.include_router(nse.router)
 
 origins = [
     "http://localhost:4200"
