@@ -30,7 +30,7 @@ def get_cars(holiday_type="trading"):
 @router.get("/top-corp-info")
 def get_cars(symbol: str | None = "INFY", market: str = "equities"):
     r_session = requests.session()
-    return r_session.get(base_url + f"top-corp-info?symbol={symbol}&market={market}", headers=header).json()
+    return r_session.get(f"{base_url}top-corp-info?symbol={symbol}&market={market}", headers=header).json()
 
 
 @router.get("/equities")
