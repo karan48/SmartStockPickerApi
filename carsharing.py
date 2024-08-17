@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from db import engine
 from routers import cars, web, auth, nse
 
-app = FastAPI(title="Car Sharing")
+app = FastAPI(title="Smart Stock Picker")
 app.include_router(web.routers)
 app.include_router(cars.router)
 app.include_router(nse.router)
