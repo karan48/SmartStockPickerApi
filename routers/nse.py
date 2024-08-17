@@ -9,7 +9,8 @@ from fastapi import Depends, HTTPException, APIRouter
 from sqlmodel import Session, select
 from db import get_session
 from typing import Sequence, Type, List
-from schema.equity import Equity, EquityInput, EquityOutput
+from schema.equity import Equity, EquityInput
+from schema.board_meeting_schema import BoardMeeting, BoardMeetingInput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -105,3 +106,24 @@ def equities():
     csv_data = StringIO(response.text)
     df = pd.read_csv(csv_data)
     return df.to_json(orient='records')
+
+
+
+@router.post("/insert-borad-meeting")
+def insert_borad_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session = Depends(get_session)) -> List[BoardMeeting]:
+    new_board_meetings = []
+    for board_meeting_input in board_meeting_inputs:
+        new_board_meeting = BoardMeeting.model_validate(board_meeting_input)
+        session.add(new_board_meeting)
+        new_board_meetings.append(new_board_meeting)
+
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=f"An error occurred: {e}")
+
+    for board_meeting in new_board_meeting:
+        session.refresh(board_meeting)
+
+    return new_board_meetings
