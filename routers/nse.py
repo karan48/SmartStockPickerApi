@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, APIRouter
 from sqlmodel import Session, select
 from db import get_session
 from typing import Sequence, Type, List
-from schema.equity import Equity, EquityInput
+from schema.equity import Equity, EquityInput, EquityOutput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -36,6 +36,25 @@ def get_equities(symbol: str | None = None, isin_number: str | None = None,
     if isin_number:
         query = query.where(Equity.isin_number == isin_number)
     return session.exec(query).all()
+
+
+@router.get("/update-companies-corp-info")
+def update_companies_corp_info(session: Session = Depends(get_session)):
+    query = select(Equity)
+    query = query.where(Equity.symbol == 'INFY')
+    all_equities: Sequence[Equity] = session.exec(query).all()
+    company_info = []
+
+    # Apply for loop to process each Equity instance
+    for equity in all_equities:
+        print(f"Processing Equity with symbol: {equity.symbol}")
+        if equity.series == 'EQ':
+            r_session = requests.session()
+            company_info = r_session.get(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities",
+                                         headers=header).json()
+
+    # Return the equities (or modify as needed)
+    return company_info
 
 
 @router.post("/insert-equity", response_model=Equity)
@@ -86,4 +105,3 @@ def equities():
     csv_data = StringIO(response.text)
     df = pd.read_csv(csv_data)
     return df.to_json(orient='records')
-
