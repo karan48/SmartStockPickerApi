@@ -41,6 +41,7 @@ def nsefetch(payload):
     return output
 
 
+# Get all equities or search equity by Symbol or ISIN
 @router.get("/equities")
 def get_equities(symbol: str | None = None, isin_number: str | None = None,
                  session: Session = Depends(get_session)) -> Sequence[Equity]:
@@ -52,6 +53,7 @@ def get_equities(symbol: str | None = None, isin_number: str | None = None,
     return session.exec(query).all()
 
 
+# Insert equity into database
 @router.post("/insert-equity", response_model=Equity)
 def insert_equity(car_input: EquityInput, session: Session = Depends(get_session)) -> Equity:
     new_equity = Equity.model_validate(car_input)
@@ -61,6 +63,7 @@ def insert_equity(car_input: EquityInput, session: Session = Depends(get_session
     return new_equity
 
 
+# Insert multiple equities into database
 @router.post("/insert-equity-multiple", response_model=List[Equity])
 def insert_equity_multiple(equity_inputs: List[EquityInput], session: Session = Depends(get_session)) -> List[Equity]:
     new_equities = []
@@ -81,18 +84,21 @@ def insert_equity_multiple(equity_inputs: List[EquityInput], session: Session = 
     return new_equities
 
 
+# Get trading holidays
 @router.get("/holiday-master")
 def holiday_master(holiday_type="trading"):
     r_session = requests.session()
     return r_session.get(base_url + f"holiday-master?type={holiday_type}", headers=header).json()
 
 
+# Get company corporation information
 @router.get("/top-corp-info")
 def top_corp_info(symbol: str | None = "INFY", market: str = "equities"):
     r_session = requests.session()
     return r_session.get(base_url + f"top-corp-info?symbol={symbol}&market={market}", headers=header).json()
 
 
+# Get all equeties in CSV format
 @router.get("/equities_nse")
 def equities():
     r_session = requests.session()
@@ -102,6 +108,7 @@ def equities():
     return df.to_json(orient='records')
 
 
+# Update carporation information of companies
 @router.get("/update-companies-corp-info")
 def update_companies_corp_info(session: Session = Depends(get_session)):
     query = select(Equity).where(Equity.symbol == 'INFY')
@@ -113,7 +120,7 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
             try:
                 company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
                 board_meetings_data = company_info['borad_meeting']['data']
-                insert_board_meeting(board_meetings_data, session)
+                update_board_meeting(board_meetings_data, session)
                 returnMsg = {"message": "Company information updated successfully"}
             except requests.exceptions.JSONDecodeError:
                 returnMsg = {"message": f"Failed to parse JSON {equity.symbol}"}
@@ -122,7 +129,8 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
     return returnMsg
 
 
-def insert_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
+# Update companies board meering
+def update_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
     new_board_meetings = []
     for board_meeting_input in board_meeting_inputs:
         new_board_meeting = BoardMeeting.model_validate(board_meeting_input)
