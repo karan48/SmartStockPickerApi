@@ -19,13 +19,26 @@ header = {
     "Cache-Control": "max-age=0",
     "DNT": "1",
     "Upgrade-Insecure-Requests": "1",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/111.0.0.0 Safari/537.36",
-    "Sec-Fetch-User": "?1", "Accept": "*/*", "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate",
-    "Accept-Encoding": "gzip, deflate, br", "Accept-Language": "en-US,en;q=0.9,hi;q=0.8"
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 '
+                  'Safari/537.36',
+    "Sec-Fetch-User": "?1", "Accept": "*/*",
+    "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
 }
 
 base_url = "https://www.nseindia.com/api/"
+
+
+# Use to fet NSE API
+def nsefetch(payload):
+    try:
+        output = requests.get(payload, headers=header).json()        
+    except ValueError:
+        s = requests.Session()
+        output = s.get("http://nseindia.com", headers=header)
+        output = s.get(payload, headers=header).json()
+    return output
 
 
 @router.get("/equities")
@@ -37,25 +50,6 @@ def get_equities(symbol: str | None = None, isin_number: str | None = None,
     if isin_number:
         query = query.where(Equity.isin_number == isin_number)
     return session.exec(query).all()
-
-
-@router.get("/update-companies-corp-info")
-def update_companies_corp_info(session: Session = Depends(get_session)):
-    query = select(Equity)
-    query = query.where(Equity.symbol == 'INFY')
-    all_equities: Sequence[Equity] = session.exec(query).all()
-    company_info = []
-
-    # Apply for loop to process each Equity instance
-    for equity in all_equities:
-        print(f"Processing Equity with symbol: {equity.symbol}")
-        if equity.series == 'EQ':
-            r_session = requests.session()
-            company_info = r_session.get(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities",
-                                         headers=header).json()
-
-    # Return the equities (or modify as needed)
-    return company_info
 
 
 @router.post("/insert-equity", response_model=Equity)
@@ -108,9 +102,27 @@ def equities():
     return df.to_json(orient='records')
 
 
+@router.get("/update-companies-corp-info")
+def update_companies_corp_info(session: Session = Depends(get_session)):
+    query = select(Equity).where(Equity.symbol == 'INFY')
+    all_equities: Sequence[Equity] = session.exec(query).all()
+    company_info = []
+    returnMsg = {"message": ""}
+    for equity in all_equities:
+        if equity.series == 'EQ':
+            try:
+                company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
+                board_meetings_data = company_info['borad_meeting']['data']
+                insert_board_meeting(board_meetings_data, session)
+                returnMsg = {"message": "Company information updated successfully"}
+            except requests.exceptions.JSONDecodeError:
+                returnMsg = {"message": f"Failed to parse JSON {equity.symbol}"}
+            except Exception as e:
+                returnMsg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+    return returnMsg
 
-@router.post("/insert-borad-meeting")
-def insert_borad_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session = Depends(get_session)) -> List[BoardMeeting]:
+
+def insert_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
     new_board_meetings = []
     for board_meeting_input in board_meeting_inputs:
         new_board_meeting = BoardMeeting.model_validate(board_meeting_input)
@@ -123,7 +135,7 @@ def insert_borad_meeting(board_meeting_inputs: List[BoardMeetingInput], session:
         session.rollback()
         raise HTTPException(status_code=400, detail=f"An error occurred: {e}")
 
-    for board_meeting in new_board_meeting:
+    for board_meeting in new_board_meetings:
         session.refresh(board_meeting)
 
     return new_board_meetings
