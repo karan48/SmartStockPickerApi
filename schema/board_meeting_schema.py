@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlmodel import SQLModel, Field, Relationship, VARCHAR, Column
 
@@ -14,6 +14,7 @@ class BoardMeetingOutput(BoardMeetingInput):
     meetingdate: str
     purpose: str
     symbol: str
+    last_updated: datetime
 
 
 class BoardMeeting(BoardMeetingInput, table=True):
@@ -23,4 +24,5 @@ class BoardMeeting(BoardMeetingInput, table=True):
     symbol: str = Field()
     meetingdate: str = Field(default=None)
     purpose: str = Field(default=None)
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
 

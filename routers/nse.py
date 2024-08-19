@@ -1,6 +1,3 @@
-import csv
-
-from fastapi import APIRouter, HTTPException
 import requests
 import pandas as pd
 from io import StringIO
@@ -8,9 +5,10 @@ from io import StringIO
 from fastapi import Depends, HTTPException, APIRouter
 from sqlmodel import Session, select
 from db import get_session
-from typing import Sequence, Type, List
+from typing import Sequence, List
+
+from nse_component.board_meeting import override_board_meeting
 from schema.equity import Equity, EquityInput
-from schema.board_meeting_schema import BoardMeeting, BoardMeetingInput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -131,43 +129,3 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
             except Exception as e:
                 return_msg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
     return return_msg
-
-
-def override_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
-    try:
-        if board_meeting_inputs.__len__() > 0:
-            remove_cars_by_size(board_meeting_inputs[0]['symbol'], session)
-
-        update_board_meeting(board_meeting_inputs, session)
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=400, detail=f"An error occurred while overriding board meetings: {e}")
-
-
-# Update companies board meeting
-def update_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
-    new_board_meetings = []
-    for board_meeting_input in board_meeting_inputs:
-        new_board_meeting = BoardMeeting.model_validate(board_meeting_input)
-        session.add(new_board_meeting)
-        new_board_meetings.append(new_board_meeting)
-
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=400, detail=f"An error occurred: {e}")
-
-    for board_meeting in new_board_meetings:
-        session.refresh(board_meeting)
-
-    return new_board_meetings
-
-
-def remove_cars_by_size(symbol: str, session) -> None:
-    board_meeting = session.query(BoardMeeting).filter(BoardMeeting.symbol == symbol).all()
-
-    if board_meeting:
-        for bm in board_meeting:
-            session.delete(bm)
-        session.commit()
