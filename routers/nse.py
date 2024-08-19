@@ -108,28 +108,43 @@ def equities():
     return df.to_json(orient='records')
 
 
-# Update carporation information of companies
+# Update corporation information of companies
 @router.get("/update-companies-corp-info")
 def update_companies_corp_info(session: Session = Depends(get_session)):
     query = select(Equity).where(Equity.symbol == 'INFY')
     all_equities: Sequence[Equity] = session.exec(query).all()
-    company_info = []
-    returnMsg = {"message": ""}
+    return_msg = {"message": ""}
     for equity in all_equities:
         if equity.series == 'EQ':
             try:
                 company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
                 board_meetings_data = company_info['borad_meeting']['data']
-                update_board_meeting(board_meetings_data, session)
-                returnMsg = {"message": "Company information updated successfully"}
+                override_board_meeting(board_meetings_data, session)
+                return_msg = {
+                    "message": "Company information updated successfully",
+                    "data": {
+                        "board_meetings": board_meetings_data
+                    }
+                }
             except requests.exceptions.JSONDecodeError:
-                returnMsg = {"message": f"Failed to parse JSON {equity.symbol}"}
+                return_msg = {"message": f"Failed to parse JSON {equity.symbol}"}
             except Exception as e:
-                returnMsg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
-    return returnMsg
+                return_msg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+    return return_msg
 
 
-# Update companies board meering
+def override_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
+    try:
+        if board_meeting_inputs.__len__() > 0:
+            remove_cars_by_size(board_meeting_inputs[0]['symbol'], session)
+
+        update_board_meeting(board_meeting_inputs, session)
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=f"An error occurred while overriding board meetings: {e}")
+
+
+# Update companies board meeting
 def update_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session):
     new_board_meetings = []
     for board_meeting_input in board_meeting_inputs:
@@ -147,3 +162,12 @@ def update_board_meeting(board_meeting_inputs: List[BoardMeetingInput], session:
         session.refresh(board_meeting)
 
     return new_board_meetings
+
+
+def remove_cars_by_size(symbol: str, session) -> None:
+    board_meeting = session.query(BoardMeeting).filter(BoardMeeting.symbol == symbol).all()
+
+    if board_meeting:
+        for bm in board_meeting:
+            session.delete(bm)
+        session.commit()
