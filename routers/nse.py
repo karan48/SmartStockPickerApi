@@ -119,8 +119,8 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
             try:
                 company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
                 override_board_meeting(company_info['borad_meeting']['data'], session)
-                override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], session)
-                
+                override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], equity.symbol, session)
+
                 return_msg = {
                     "message": "Company information updated successfully"
                 }

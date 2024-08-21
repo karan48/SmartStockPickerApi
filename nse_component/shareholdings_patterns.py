@@ -8,7 +8,7 @@ from schema.shareholdings_patterns_schema import ShareholdingsPatterns, Sharehol
 
 
 # Override companies board meeting
-def override_shareholdings_patterns(shareholdings_patterns_fetched_inputs, session: Session):
+def override_shareholdings_patterns(shareholdings_patterns_fetched_inputs, symbol, session: Session):
     try:
         shareholdings_patterns_inputs: List[ShareholdingsPatternsInput] = []
         for date, holdings in shareholdings_patterns_fetched_inputs.items():
@@ -19,6 +19,7 @@ def override_shareholdings_patterns(shareholdings_patterns_fetched_inputs, sessi
                     promoter=holdings[0]['Promoter & Promoter Group'].strip(),
                     public=holdings[1]['Public'].strip(),
                     employee_trusts=holdings[2]['Shares held by Employee Trusts'].strip(),
+                    symbol=symbol,
                     nse_last_updated=nse_date
                 )
             ]
