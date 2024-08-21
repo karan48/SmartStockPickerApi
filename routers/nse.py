@@ -1,6 +1,3 @@
-import csv
-
-from fastapi import APIRouter, HTTPException
 import requests
 import pandas as pd
 from io import StringIO
@@ -8,9 +5,12 @@ from io import StringIO
 from fastapi import Depends, HTTPException, APIRouter
 from sqlmodel import Session, select
 from db import get_session
-from typing import Sequence, Type, List
+from typing import Sequence, List
+
+from nse_component.board_meeting import override_board_meeting
+from nse_component.financial_results import override_financial_results
+from nse_component.shareholdings_patterns import override_shareholdings_patterns
 from schema.equity import Equity, EquityInput
-from schema.board_meeting_schema import BoardMeeting, BoardMeetingInput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -19,15 +19,29 @@ header = {
     "Cache-Control": "max-age=0",
     "DNT": "1",
     "Upgrade-Insecure-Requests": "1",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/111.0.0.0 Safari/537.36",
-    "Sec-Fetch-User": "?1", "Accept": "*/*", "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate",
-    "Accept-Encoding": "gzip, deflate, br", "Accept-Language": "en-US,en;q=0.9,hi;q=0.8"
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 '
+                  'Safari/537.36',
+    "Sec-Fetch-User": "?1", "Accept": "*/*",
+    "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
 }
 
 base_url = "https://www.nseindia.com/api/"
 
 
+# Use to fet NSE API
+def nsefetch(url):
+    try:
+        output = requests.get(url, headers=header).json()
+    except ValueError:
+        s = requests.Session()
+        output = s.get("http://nseindia.com", headers=header)
+        output = s.get(url, headers=header).json()
+    return output
+
+
+# Get all equities or search equity by Symbol or ISIN
 @router.get("/equities")
 def get_equities(symbol: str | None = None, isin_number: str | None = None,
                  session: Session = Depends(get_session)) -> Sequence[Equity]:
@@ -39,25 +53,7 @@ def get_equities(symbol: str | None = None, isin_number: str | None = None,
     return session.exec(query).all()
 
 
-@router.get("/update-companies-corp-info")
-def update_companies_corp_info(session: Session = Depends(get_session)):
-    query = select(Equity)
-    query = query.where(Equity.symbol == 'INFY')
-    all_equities: Sequence[Equity] = session.exec(query).all()
-    company_info = []
-
-    # Apply for loop to process each Equity instance
-    for equity in all_equities:
-        print(f"Processing Equity with symbol: {equity.symbol}")
-        if equity.series == 'EQ':
-            r_session = requests.session()
-            company_info = r_session.get(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities",
-                                         headers=header).json()
-
-    # Return the equities (or modify as needed)
-    return company_info
-
-
+# Insert equity into database
 @router.post("/insert-equity", response_model=Equity)
 def insert_equity(car_input: EquityInput, session: Session = Depends(get_session)) -> Equity:
     new_equity = Equity.model_validate(car_input)
@@ -67,6 +63,7 @@ def insert_equity(car_input: EquityInput, session: Session = Depends(get_session
     return new_equity
 
 
+# Insert multiple equities into database
 @router.post("/insert-equity-multiple", response_model=List[Equity])
 def insert_equity_multiple(equity_inputs: List[EquityInput], session: Session = Depends(get_session)) -> List[Equity]:
     new_equities = []
@@ -87,18 +84,21 @@ def insert_equity_multiple(equity_inputs: List[EquityInput], session: Session = 
     return new_equities
 
 
+# Get trading holidays
 @router.get("/holiday-master")
 def holiday_master(holiday_type="trading"):
     r_session = requests.session()
     return r_session.get(base_url + f"holiday-master?type={holiday_type}", headers=header).json()
 
 
+# Get company corporation information
 @router.get("/top-corp-info")
 def top_corp_info(symbol: str | None = "INFY", market: str = "equities"):
     r_session = requests.session()
     return r_session.get(base_url + f"top-corp-info?symbol={symbol}&market={market}", headers=header).json()
 
 
+# Get all equeties in CSV format
 @router.get("/equities_nse")
 def equities():
     r_session = requests.session()
@@ -108,22 +108,25 @@ def equities():
     return df.to_json(orient='records')
 
 
+# Update corporation information of companies
+@router.get("/update-companies-corp-info")
+def update_companies_corp_info(session: Session = Depends(get_session)):
+    query = select(Equity).where(Equity.symbol == 'INFY')
+    all_equities: Sequence[Equity] = session.exec(query).all()
+    return_msg = {"message": ""}
+    for equity in all_equities:
+        if equity.series == 'EQ':
+            try:
+                company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
+                override_board_meeting(company_info['borad_meeting']['data'], session)
+                override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], equity.symbol, session)
+                override_financial_results(company_info['financial_results']['data'], equity.symbol, session)
 
-@router.post("/insert-borad-meeting")
-def insert_borad_meeting(board_meeting_inputs: List[BoardMeetingInput], session: Session = Depends(get_session)) -> List[BoardMeeting]:
-    new_board_meetings = []
-    for board_meeting_input in board_meeting_inputs:
-        new_board_meeting = BoardMeeting.model_validate(board_meeting_input)
-        session.add(new_board_meeting)
-        new_board_meetings.append(new_board_meeting)
-
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=400, detail=f"An error occurred: {e}")
-
-    for board_meeting in new_board_meeting:
-        session.refresh(board_meeting)
-
-    return new_board_meetings
+                return_msg = {
+                    "message": "Company information updated successfully"
+                }
+            except requests.exceptions.JSONDecodeError:
+                return_msg = {"message": f"Failed to parse JSON {equity.symbol}"}
+            except Exception as e:
+                return_msg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+    return return_msg
