@@ -8,7 +8,9 @@ from db import get_session
 from typing import Sequence, List
 
 from nse_component.board_meeting import override_board_meeting
+from nse_component.shareholdings_patterns import override_shareholdings_patterns
 from schema.equity import Equity, EquityInput
+from schema.shareholdings_patterns_schema import ShareholdingsPatternsInput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -29,13 +31,13 @@ base_url = "https://www.nseindia.com/api/"
 
 
 # Use to fet NSE API
-def nsefetch(payload):
+def nsefetch(url):
     try:
-        output = requests.get(payload, headers=header).json()        
+        output = requests.get(url, headers=header).json()
     except ValueError:
         s = requests.Session()
         output = s.get("http://nseindia.com", headers=header)
-        output = s.get(payload, headers=header).json()
+        output = s.get(url, headers=header).json()
     return output
 
 
@@ -116,13 +118,11 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
         if equity.series == 'EQ':
             try:
                 company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
-                board_meetings_data = company_info['borad_meeting']['data']
-                override_board_meeting(board_meetings_data, session)
+                override_board_meeting(company_info['borad_meeting']['data'], session)
+                override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], session)
+                
                 return_msg = {
-                    "message": "Company information updated successfully",
-                    "data": {
-                        "board_meetings": board_meetings_data
-                    }
+                    "message": "Company information updated successfully"
                 }
             except requests.exceptions.JSONDecodeError:
                 return_msg = {"message": f"Failed to parse JSON {equity.symbol}"}
