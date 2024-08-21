@@ -4,6 +4,7 @@ from sqlmodel import SQLModel, Field
 
 
 class ShareholdingsPatternsInput(SQLModel):
+    symbol: str
     promoter: str
     public: str
     employee_trusts: str
@@ -12,6 +13,7 @@ class ShareholdingsPatternsInput(SQLModel):
 
 class ShareholdingsPatternsOutput(ShareholdingsPatternsInput):
     id: int
+    symbol: str
     promoter: str
     public: str
     employee_trusts: str
@@ -23,6 +25,7 @@ class ShareholdingsPatterns(ShareholdingsPatternsInput, table=True):
     __tablename__ = "shareholdings_patterns"
 
     id: int | None = Field(primary_key=True, default=None)
+    symbol: str = Field(default=None)
     promoter: str = Field(default=None)
     public: str = Field(default=None)
     employee_trusts: str = Field(default=None)

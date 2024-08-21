@@ -10,6 +10,9 @@ from schema.shareholdings_patterns_schema import ShareholdingsPatterns, Sharehol
 # Override companies board meeting
 def override_shareholdings_patterns(shareholdings_patterns_fetched_inputs, symbol, session: Session):
     try:
+        # Remove existing share holding
+        remove_shareholdings_patterns(symbol, session)
+
         shareholdings_patterns_inputs: List[ShareholdingsPatternsInput] = []
         for date, holdings in shareholdings_patterns_fetched_inputs.items():
             date_object = datetime.strptime(date.strip(), "%d-%b-%Y")
@@ -24,13 +27,14 @@ def override_shareholdings_patterns(shareholdings_patterns_fetched_inputs, symbo
                 )
             ]
 
+        # Update share holding
         update_shareholdings_patterns(shareholdings_patterns_inputs, session)
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=400, detail=f"An error occurred while overriding shareholdings patterns: {e}")
 
 
-# override companies board meeting
+# update_shareholdings_patterns
 def update_shareholdings_patterns(shareholdings_patterns_inputs: List[ShareholdingsPatternsInput], session: Session):
     new_board_meetings = []
     for shareholdings_patterns_input in shareholdings_patterns_inputs:
@@ -50,7 +54,7 @@ def update_shareholdings_patterns(shareholdings_patterns_inputs: List[Shareholdi
     return new_board_meetings
 
 
-# Delete companies board meeting by symbol
+# Delete update_shareholdings_patterns by symbol
 def remove_shareholdings_patterns(symbol: str, session) -> None:
     shareholdings_patterns = session.query(ShareholdingsPatterns).filter(ShareholdingsPatterns.symbol == symbol).all()
 

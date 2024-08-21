@@ -8,9 +8,9 @@ from db import get_session
 from typing import Sequence, List
 
 from nse_component.board_meeting import override_board_meeting
+from nse_component.financial_results import override_financial_results
 from nse_component.shareholdings_patterns import override_shareholdings_patterns
 from schema.equity import Equity, EquityInput
-from schema.shareholdings_patterns_schema import ShareholdingsPatternsInput
 
 router = APIRouter(prefix="/api/nse")
 
@@ -120,6 +120,7 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
                 company_info = nsefetch(base_url + f"top-corp-info?symbol={equity.symbol}&market=equities")
                 override_board_meeting(company_info['borad_meeting']['data'], session)
                 override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], equity.symbol, session)
+                override_financial_results(company_info['financial_results']['data'], equity.symbol, session)
 
                 return_msg = {
                     "message": "Company information updated successfully"
