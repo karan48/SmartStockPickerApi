@@ -8,6 +8,7 @@ from db import get_session
 from typing import Sequence, List
 
 from nse_component.board_meeting import override_board_meeting
+from nse_component.dividend_service import override_dividend_results
 from nse_component.financial_results import override_financial_results
 from nse_component.shareholdings_patterns import override_shareholdings_patterns
 from schema.equity import Equity, EquityInput
@@ -110,10 +111,11 @@ def equities():
 
 # Update corporation information of companies
 @router.get("/update-companies-corp-info")
-def update_companies_corp_info(session: Session = Depends(get_session)):
-    query = select(Equity).where(Equity.symbol == 'INFY')
+def update_companies_corp_info(offset: int = 0, limit: int = 1, session: Session = Depends(get_session)):
+    # query = select(Equity).where(Equity.symbol == 'AAREYDRUGS')
+    query = select(Equity).offset(offset).limit(limit)
     all_equities: Sequence[Equity] = session.exec(query).all()
-    return_msg = {"message": ""}
+    errors: List[dict] = []
     for equity in all_equities:
         if equity.series == 'EQ':
             try:
@@ -121,12 +123,18 @@ def update_companies_corp_info(session: Session = Depends(get_session)):
                 override_board_meeting(company_info['borad_meeting']['data'], session)
                 override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], equity.symbol, session)
                 override_financial_results(company_info['financial_results']['data'], equity.symbol, session)
-
-                return_msg = {
-                    "message": "Company information updated successfully"
-                }
+                override_dividend_results(company_info['corporate_actions']['data'], equity.symbol, session)    
             except requests.exceptions.JSONDecodeError:
-                return_msg = {"message": f"Failed to parse JSON {equity.symbol}"}
+                errors.append({"symbol": equity.symbol, "error": "Json parse error or No data available"})
+                # return {"message": f"Failed to parse JSON {equity.symbol}"}
             except Exception as e:
-                return_msg = {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+                    errors.append({"symbol": equity.symbol, "error": str(e)})
+                # return {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+    return_msg = {
+        "message": f"Company information updated successfully",
+        "data": {
+            "symbol": [equity.symbol for equity in all_equities],
+            "error": errors
+        }
+    }
     return return_msg
