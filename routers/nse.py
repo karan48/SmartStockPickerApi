@@ -11,7 +11,11 @@ from nse_component.board_meeting import override_board_meeting
 from nse_component.dividend_service import override_dividend_results
 from nse_component.financial_results import override_financial_results
 from nse_component.shareholdings_patterns import override_shareholdings_patterns
+from schema.board_meeting_schema import BoardMeeting
+from schema.dividend_schema import Dividend
 from schema.equity import Equity, EquityInput
+from schema.financial_results_schema import FinancialResults
+from schema.shareholdings_patterns_schema import ShareholdingsPatterns
 
 router = APIRouter(prefix="/api/nse")
 
@@ -123,13 +127,13 @@ def update_companies_corp_info(offset: int = 0, limit: int = 1, session: Session
                 override_board_meeting(company_info['borad_meeting']['data'], session)
                 override_shareholdings_patterns(company_info['shareholdings_patterns']['data'], equity.symbol, session)
                 override_financial_results(company_info['financial_results']['data'], equity.symbol, session)
-                override_dividend_results(company_info['corporate_actions']['data'], equity.symbol, session)    
+                override_dividend_results(company_info['corporate_actions']['data'], equity.symbol, session)
             except requests.exceptions.JSONDecodeError:
                 errors.append({"symbol": equity.symbol, "error": "Json parse error or No data available"})
                 # return {"message": f"Failed to parse JSON {equity.symbol}"}
             except Exception as e:
-                    errors.append({"symbol": equity.symbol, "error": str(e)})
-                # return {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
+                errors.append({"symbol": equity.symbol, "error": str(e)})
+            # return {"message": f"An error occurred while processing {equity.symbol}: {str(e)}"}
     return_msg = {
         "message": f"Company information updated successfully",
         "data": {
@@ -137,4 +141,26 @@ def update_companies_corp_info(offset: int = 0, limit: int = 1, session: Session
             "error": errors
         }
     }
+    return return_msg
+
+
+@router.get("/get-info")
+def get_info(offset: int = 0, limit: int = 1, session: Session = Depends(get_session)):
+    # query = select(Equity).where(Equity.symbol == 'AAREYDRUGS')
+    query = select(Equity).offset(offset).limit(limit)
+    all_equities: Sequence[Equity] = session.exec(query).all()
+    errors: List[dict] = []
+    return_msg = []
+    for equity in all_equities:
+        if equity.series == 'EQ':
+            try:
+                dividend = session.exec(select(Dividend).where(Dividend.symbol == equity.symbol)).all()
+                board_meeting = session.exec(select(BoardMeeting).where(BoardMeeting.symbol == equity.symbol)).all()
+                financial_results = session.exec(select(FinancialResults).where(FinancialResults.symbol == equity.symbol)).all()
+                shareholdings_patterns = session.exec(select(ShareholdingsPatterns).where(ShareholdingsPatterns.symbol == equity.symbol)).all()
+
+                return_msg.append({"equity": equity, "dividend": dividend, "board_meeting": board_meeting, "financial_results": financial_results, "shareholdings_patterns": shareholdings_patterns})
+
+            except Exception as e:
+                errors.append({"symbol": equity.symbol, "error": str(e)})
     return return_msg
