@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 from fastapi import HTTPException
 from sqlmodel import Session
-from schema.financial_results_schema import FinancialResults, FinancialResultsInput
+from schema.financial_results_schema import FinancialResults
 
 
 # Override companies financial_results
