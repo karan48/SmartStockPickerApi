@@ -116,7 +116,7 @@ def equities():
 # Update corporation information of companies
 @router.get("/update-companies-corp-info")
 def update_companies_corp_info(offset: int = 0, limit: int = 1, session: Session = Depends(get_session)):
-    # query = select(Equity).where(Equity.symbol == 'AAREYDRUGS')
+    # query = select(Equity).where(Equity.symbol == 'ASHOKA')
     query = select(Equity).offset(offset).limit(limit)
     all_equities: Sequence[Equity] = session.exec(query).all()
     errors: List[dict] = []
@@ -146,7 +146,6 @@ def update_companies_corp_info(offset: int = 0, limit: int = 1, session: Session
 
 @router.get("/get-info")
 def get_info(offset: int = 0, limit: int = 1, session: Session = Depends(get_session)):
-    # query = select(Equity).where(Equity.symbol == 'AAREYDRUGS')
     query = select(Equity).offset(offset).limit(limit)
     all_equities: Sequence[Equity] = session.exec(query).all()
     errors: List[dict] = []
@@ -156,11 +155,27 @@ def get_info(offset: int = 0, limit: int = 1, session: Session = Depends(get_ses
             try:
                 dividend = session.exec(select(Dividend).where(Dividend.symbol == equity.symbol)).all()
                 board_meeting = session.exec(select(BoardMeeting).where(BoardMeeting.symbol == equity.symbol)).all()
+
                 financial_results = session.exec(select(FinancialResults).where(FinancialResults.symbol == equity.symbol)).all()
+                financial_results = financial_result_rules(financial_results)
+
                 shareholdings_patterns = session.exec(select(ShareholdingsPatterns).where(ShareholdingsPatterns.symbol == equity.symbol)).all()
 
-                return_msg.append({"equity": equity, "dividend": dividend, "board_meeting": board_meeting, "financial_results": financial_results, "shareholdings_patterns": shareholdings_patterns})
-
+                if financial_results.__len__() > 0:
+                    return_msg.append({"equity": equity, "dividend": dividend, "board_meeting": board_meeting, "financial_results": financial_results, "shareholdings_patterns": shareholdings_patterns})
+                else:
+                    print("equity", equity)
             except Exception as e:
                 errors.append({"symbol": equity.symbol, "error": str(e)})
     return return_msg
+
+
+def financial_result_rules(financial_results):
+    return_data = []
+    financial_results = list(financial_results)
+    for financial_result in financial_results:
+        financial_result_dict = financial_result.__dict__.copy()
+        financial_result_dict['income_pnl_after_tax_ratio'] = financial_result_dict['income'] / financial_result_dict['proLossAftTax']
+        return_data.append(financial_result_dict)
+    return return_data
+
